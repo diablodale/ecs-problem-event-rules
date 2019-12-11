@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >-
+  ECS problem event rules
+  https://github.com/diablodale/ecs-problem-event-rules
+
+Parameters:
+  SnsTopicNotify:
+    Type: String
+    Description: full SNS arn to receive notifications
+
+Resources:
+  EventRuleEcsTaskStateChange:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: notify-ecs-task-state-change
+      Description: >-
+        detects ECS essential containers that exit and
+        notifies an SNS topic
+      State: ENABLED
+      Targets:
+        - Arn:
+            Ref: SnsTopicNotify
+          Id: EventRuleEcsTaskStateChange-t1
+          InputTransformer:
+            InputPathsMap:
+              eventtime: $.time
+              region: $.region
+              cluster: $.detail.clusterArn
+              group: $.detail.group
+              createtime: $.detail.createdAt
+              stoppedReason: $.detail.stoppedReason
+            # https://stackoverflow.com/questions/52050539/cloudformation-cloudwatch-inputtemplate-formating/52290948
+            # cloudformation+cloudwatch wants a string of a double-quoted string
+            # yaml+cloudformation fails to parse:
+            # * plain flow scalers
+            # * double-quoted flow scalars with escaped double-quotes
+            # * any value with newlines in the string content itself
+            # therefore for multiple lines, you must create a yaml string of multiple double-quoted string lines containing no newlines
+            # and the output of that will be literally multiple lines of double-quoted string lines
+            InputTemplate: |
+              "<stoppedReason> -- Task terminated"
+              "Stop time: <eventtime>"
+              "Region: <region>"
+              "Cluster: <cluster>"
+              "Grouping: <group>"
+              "Create time: <createtime>"
+      EventPattern:
+        source:
+          - aws.ecs
+        detail-type: # https://docs.aws.amazon.com/AmazonECS/latest/userguide/ecs_cwet2.html
+          - ECS Task State Change
+        detail:
+          lastStatus:
+            - STOPPED
+          stoppedReason:
+            - Essential container in task exited
+
+  EventRuleEcsServiceAction:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: notify-ecs-service-action
+      Description: >-
+        detects ECS service action events and notifies an SNS topic
+      State: ENABLED
+      Targets:
+        - Arn:
+            Ref: SnsTopicNotify
+          Id: EventRuleEcsServiceAction-t1
+          InputTransformer:
+            InputPathsMap:
+              eventtime: $.time
+              region: $.region
+              cluster: $.detail.clusterArn
+              group: $.resources[0]
+              createtime: $.detail.createdAt
+              eventType: $.detail.eventType
+              eventName: $.detail.eventName
+            InputTemplate: |
+              "<eventType> -- <eventName>"
+              "Stop time:  <eventtime>"
+              "Region:  <region>"
+              "Cluster:  <cluster>"
+              "Grouping:  <group>"
+              "Create time:  <createtime>"
+      EventPattern:
+        source:
+          - aws.ecs
+        detail-type: # https://docs.aws.amazon.com/AmazonECS/latest/userguide/ecs_cwe_events.html
+          - ECS Service Action
+        detail:
+          eventType:
+            - WARN
+            - ERROR
