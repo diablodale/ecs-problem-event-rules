@@ -15,8 +15,7 @@ Resources:
     Properties:
       Name: notify-ecs-task-state-change
       Description: >-
-        detects ECS essential containers that exit and
-        notifies an SNS topic
+        ECS essential containers that exit -> notifies SNS topic; created by Cloudformation
       State: ENABLED
       Targets:
         - Arn:
@@ -61,7 +60,7 @@ Resources:
     Properties:
       Name: notify-ecs-service-action
       Description: >-
-        detects ECS service action events and notifies an SNS topic
+        ECS service action warn+error events -> notifies SNS topic; created by Cloudformation
       State: ENABLED
       Targets:
         - Arn:
